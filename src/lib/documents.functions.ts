@@ -3,7 +3,7 @@ import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const PLAN_LIMITS = { free: 5, pro: 50, team: 500 } as const;
+const PLAN_LIMITS = { free: 3, pro: 50, team: 500 } as const;
 
 const ExtractedSchema = z.object({
   document_type: z.enum(["invoice", "receipt", "purchase_order", "other"]).nullable().optional(),

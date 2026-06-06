@@ -17,7 +17,7 @@ const PLANS = [
     id: "free" as const,
     name: "Free",
     price: "$0",
-    docs: "5 docs/mo",
+    docs: "3 docs/mo",
     features: [
       "CSV & JSON export",
       "Confidence indicators",
@@ -261,7 +261,7 @@ function SettingsPage() {
               <p className="text-xs font-mono uppercase text-muted-foreground">Current plan</p>
               <p className="font-display text-xl font-bold capitalize mt-0.5">{currentPlan}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {profile?.documents_used_this_month ?? 0} / {{ free: 5, pro: 50, team: 500 }[currentPlan]} docs used this month
+                {profile?.documents_used_this_month ?? 0} / {{ free: 3, pro: 50, team: 500 }[currentPlan]} docs used this month
               </p>
             </div>
             {currentPlan !== "free" && (
