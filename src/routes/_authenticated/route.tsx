@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, LayoutDashboard, Settings, LogOut, Sun, Moon } from "lucide-react";
+import { FileText, LayoutDashboard, Settings, LogOut, Sun, Moon, BarChart2 } from "lucide-react";
 import { useAppTheme } from "@/lib/theme-context";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -50,6 +50,7 @@ function AuthedLayout() {
           <nav className="hidden gap-1 md:flex">
             <NavLink to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>Dashboard</NavLink>
             <NavLink to="/documents" icon={<FileText className="h-4 w-4" />}>Documents</NavLink>
+            <NavLink to="/analytics" icon={<BarChart2 className="h-4 w-4" />}>Analytics</NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden rounded-sm border border-border px-2 py-0.5 font-mono text-xs uppercase text-muted-foreground sm:inline">

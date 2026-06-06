@@ -95,13 +95,11 @@ export const extractDocument = createServerFn({ method: "POST" })
       if (!process.env.ANTHROPIC_API_KEY) throw new Error("AI service not configured");
       const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      const mediaType = (mime.startsWith("image/") ? mime : "image/jpeg") as
+      const isPdf = mime === "application/pdf";
+      const imageMediaType = (mime.startsWith("image/") ? mime : "image/jpeg") as
         | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
-      const aiRes = await client.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 2048,
-        system: `You are a document data extraction engine. Extract structured data from the provided invoice, receipt, or purchase order.
+      const systemPrompt = `You are a document data extraction engine. Extract structured data from the provided invoice, receipt, or purchase order.
 
 Return ONLY a valid JSON object with this exact structure — no markdown, no explanation, nothing else:
 {
@@ -130,15 +128,21 @@ Return ONLY a valid JSON object with this exact structure — no markdown, no ex
       "confidence": "high | medium | low"
     }
   ]
-}`,
+}`;
+
+      const documentContent = isPdf
+        ? { type: "document" as const, source: { type: "base64" as const, media_type: "application/pdf" as const, data: base64 } }
+        : { type: "image" as const, source: { type: "base64" as const, media_type: imageMediaType, data: base64 } };
+
+      const aiRes = await client.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 2048,
+        system: systemPrompt,
         messages: [
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: mediaType, data: base64 },
-              },
+              documentContent,
               { type: "text", text: "Extract all fields and line items from this document." },
             ],
           },
