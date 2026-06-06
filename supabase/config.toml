@@ -1,1 +1,1 @@
-project_id = "tknptjoxpjucfweamiwa"
+project_id = "env(SUPABASE_PROJECT_ID)"

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import Anthropic from "@anthropic-ai/sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const PLAN_LIMITS = { free: 30, pro: 500, team: 2000 } as const;
@@ -14,6 +15,7 @@ const ExtractedSchema = z.object({
   subtotal: z.number().nullable().optional(),
   tax_amount: z.number().nullable().optional(),
   total_amount: z.number().nullable().optional(),
+  overall_confidence: z.number().min(0).max(1).nullable().optional(),
   confidence: z.record(z.string(), z.enum(["high", "medium", "low"])).nullable().optional(),
   line_items: z.array(z.object({
     description: z.string().nullable().optional(),
@@ -76,96 +78,72 @@ export const extractDocument = createServerFn({ method: "POST" })
       const base64 = Buffer.from(ab).toString("base64");
       const mime = doc.mime_type || dl.data.type || "image/jpeg";
 
-      // Call Lovable AI Gateway with vision + tool calling
-      const apiKey = process.env.LOVABLE_API_KEY;
-      if (!apiKey) throw new Error("AI service not configured");
+      // Call Anthropic Claude for extraction
+      if (!process.env.ANTHROPIC_API_KEY) throw new Error("AI service not configured");
+      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-      const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            {
-              role: "system",
-              content: "You are a document extraction engine. Extract all structured data from invoices, receipts, and purchase orders. Always call the extract_invoice function.",
-            },
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "Extract all fields and line items from this document." },
-                { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } },
-              ],
-            },
-          ],
-          tools: [{
-            type: "function",
-            function: {
-              name: "extract_invoice",
-              description: "Return structured invoice data",
-              parameters: {
-                type: "object",
-                properties: {
-                  document_type: { type: "string", enum: ["invoice", "receipt", "purchase_order", "other"] },
-                  vendor_name: { type: "string" },
-                  invoice_number: { type: "string" },
-                  invoice_date: { type: "string", description: "YYYY-MM-DD" },
-                  due_date: { type: "string", description: "YYYY-MM-DD" },
-                  currency: { type: "string", description: "3-letter ISO" },
-                  subtotal: { type: "number" },
-                  tax_amount: { type: "number" },
-                  total_amount: { type: "number" },
-                  confidence: {
-                    type: "object",
-                    properties: {
-                      vendor_name: { type: "string", enum: ["high", "medium", "low"] },
-                      invoice_number: { type: "string", enum: ["high", "medium", "low"] },
-                      invoice_date: { type: "string", enum: ["high", "medium", "low"] },
-                      total_amount: { type: "string", enum: ["high", "medium", "low"] },
-                    },
-                  },
-                  line_items: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        description: { type: "string" },
-                        quantity: { type: "number" },
-                        unit_price: { type: "number" },
-                        line_total: { type: "number" },
-                        confidence: { type: "string", enum: ["high", "medium", "low"] },
-                      },
-                    },
-                  },
-                },
-                required: ["document_type"],
+      const mediaType = (mime.startsWith("image/") ? mime : "image/jpeg") as
+        | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+
+      const aiRes = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 2048,
+        system: `You are a document data extraction engine. Extract structured data from the provided invoice, receipt, or purchase order.
+
+Return ONLY a valid JSON object with this exact structure — no markdown, no explanation, nothing else:
+{
+  "document_type": "invoice | receipt | purchase_order | other",
+  "vendor_name": "string or null",
+  "invoice_number": "string or null",
+  "invoice_date": "YYYY-MM-DD or null",
+  "due_date": "YYYY-MM-DD or null",
+  "currency": "ISO 4217 3-letter code or null",
+  "subtotal": number or null,
+  "tax_amount": number or null,
+  "total_amount": number or null,
+  "overall_confidence": 0.0 to 1.0,
+  "confidence": {
+    "vendor_name": "high | medium | low",
+    "invoice_number": "high | medium | low",
+    "invoice_date": "high | medium | low",
+    "total_amount": "high | medium | low"
+  },
+  "line_items": [
+    {
+      "description": "string",
+      "quantity": number or null,
+      "unit_price": number or null,
+      "line_total": number or null,
+      "confidence": "high | medium | low"
+    }
+  ]
+}`,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: mediaType, data: base64 },
               },
-            },
-          }],
-          tool_choice: { type: "function", function: { name: "extract_invoice" } },
-        }),
+              { type: "text", text: "Extract all fields and line items from this document." },
+            ],
+          },
+        ],
       });
 
-      if (!aiRes.ok) {
-        const errText = await aiRes.text();
-        console.error("AI gateway error:", aiRes.status, errText);
-        if (aiRes.status === 429) throw new Error("Rate limit reached. Try again shortly.");
-        if (aiRes.status === 402) throw new Error("AI credits exhausted. Please add credits.");
-        throw new Error("AI extraction failed");
-      }
-
-      const aiJson = await aiRes.json();
-      const toolCall = aiJson.choices?.[0]?.message?.tool_calls?.[0];
-      if (!toolCall) throw new Error("AI returned no structured data");
-      const rawArgs = JSON.parse(toolCall.function.arguments);
+      const textBlock = aiRes.content.find((b) => b.type === "text");
+      if (!textBlock || textBlock.type !== "text") throw new Error("AI returned no text");
+      const rawArgs = JSON.parse(textBlock.text.trim());
       const parsed = ExtractedSchema.parse(rawArgs);
 
-      // Compute overall confidence
+      // Use model's overall_confidence if provided, else average per-field confidence
       const confMap: Record<string, number> = { high: 1, medium: 0.66, low: 0.33 };
       const confs = Object.values(parsed.confidence || {});
-      const confScore = confs.length
-        ? confs.reduce((a, b) => a + (confMap[b] ?? 0.5), 0) / confs.length
-        : 0.5;
+      const confScore = parsed.overall_confidence ??
+        (confs.length
+          ? confs.reduce((a, b: string) => a + (confMap[b] ?? 0.5), 0) / confs.length
+          : 0.5);
 
       // Write extracted_data
       await supabase.from("extracted_data").upsert({

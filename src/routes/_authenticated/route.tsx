@@ -49,19 +49,19 @@ function AuthedLayout() {
           </Link>
           <nav className="hidden gap-1 md:flex">
             <NavLink to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>Dashboard</NavLink>
-            <NavLink to="/dashboard" icon={<FileText className="h-4 w-4" />}>Documents</NavLink>
+            <NavLink to="/documents" icon={<FileText className="h-4 w-4" />}>Documents</NavLink>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="hidden rounded-sm border border-border px-2 py-0.5 font-mono text-xs uppercase text-muted-foreground sm:inline">
               {profile?.plan ?? "free"}
             </span>
-            <button
-              onClick={() => alert("Settings coming soon")}
+            <Link
+              to="/settings"
               className="rounded-md p-2 text-muted-foreground hover:bg-surface hover:text-foreground"
               aria-label="Settings"
             >
               <Settings className="h-4 w-4" />
-            </button>
+            </Link>
             <button
               id="theme-toggle-dashboard"
               onClick={toggle}

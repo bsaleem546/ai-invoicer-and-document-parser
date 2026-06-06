@@ -19,8 +19,18 @@ function ConfDot({ level }: { level: Conf }) {
 
 function ReviewPage() {
   const { id } = Route.useParams();
+  const { user } = Route.useRouteContext();
   const queryClient = useQueryClient();
   const [fileUrl, setFileUrl] = useState<string | null>(null);
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
+      return data;
+    },
+  });
+  const isPro = profile?.plan === "pro" || profile?.plan === "team";
 
   const { data, isLoading } = useQuery({
     queryKey: ["document", id],
@@ -140,12 +150,22 @@ function ReviewPage() {
           <button onClick={exportJSON} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm hover:bg-surface">
             <Download className="h-4 w-4" /> JSON
           </button>
-          <button
-            onClick={() => toast.info("QuickBooks integration coming soon")}
-            className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-surface"
-          >
-            Push to QuickBooks
-          </button>
+          {isPro ? (
+            <button
+              onClick={() => toast.info("QuickBooks integration coming soon")}
+              className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground hover:bg-surface"
+            >
+              Push to QuickBooks
+            </button>
+          ) : (
+            <button
+              onClick={() => toast.info("Upgrade to Pro to unlock QuickBooks sync")}
+              className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground opacity-50"
+              title="Pro plan required"
+            >
+              Push to QuickBooks 🔒
+            </button>
+          )}
         </div>
       </div>
 
