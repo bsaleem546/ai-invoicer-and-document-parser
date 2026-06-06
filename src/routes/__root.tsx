@@ -1,3 +1,6 @@
+import appCss from "../styles.css?url";
+import { reportLovableError } from "../lib/lovable-error-reporting";
+import { supabase } from "@/integrations/supabase/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -9,10 +12,21 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "sonner";
+import { useTheme } from "../hooks/useTheme";
+import { ThemeContext } from "../lib/theme-context";
 
-import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
-import { supabase } from "@/integrations/supabase/client";
+/* Inline script injected before page paint — prevents FOUC on theme load */
+const themeInitScript = `
+(function(){
+  try {
+    var t = localStorage.getItem('docflow-theme');
+    var theme = (t === 'light' || t === 'dark') ? t
+      : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.classList.add(theme);
+    document.documentElement.classList.remove(theme === 'dark' ? 'light' : 'dark');
+  } catch(e) {}
+})();
+`;
 
 function NotFoundComponent() {
   return (
@@ -98,6 +112,8 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
+        {/* FOUC prevention: apply theme class before first paint */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <HeadContent />
       </head>
       <body>
@@ -111,6 +127,7 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   const router = useRouter();
+  const { theme, toggle } = useTheme();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -122,9 +139,11 @@ function RootComponent() {
   }, [router, queryClient]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Outlet />
-      <Toaster theme="dark" position="top-right" />
-    </QueryClientProvider>
+    <ThemeContext.Provider value={{ theme, toggle }}>
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+        <Toaster theme={theme} position="top-right" />
+      </QueryClientProvider>
+    </ThemeContext.Provider>
   );
 }

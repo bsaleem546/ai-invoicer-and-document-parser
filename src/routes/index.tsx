@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { FileText, Zap, Layers, Shield, Check } from "lucide-react";
+import { FileText, Zap, Layers, Shield, Check, Sun, Moon } from "lucide-react";
+import { useAppTheme } from "@/lib/theme-context";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,10 +16,11 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const { theme, toggle } = useAppTheme();
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center px-4">
+        <div className="flex h-14 w-full items-center px-6">
           <Link to="/" className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-sm bg-primary" />
             <span className="font-display text-lg font-bold">DocFlow</span>
@@ -26,6 +29,14 @@ function Landing() {
             <a href="#features" className="hidden px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground sm:inline">Features</a>
             <a href="#pricing" className="hidden px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground sm:inline">Pricing</a>
             <Link to="/auth" className="rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">Sign in</Link>
+            <button
+              id="theme-toggle-landing"
+              onClick={toggle}
+              aria-label="Toggle theme"
+              className="theme-toggle"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
             <Link to="/auth" className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
               Start free
             </Link>
@@ -35,7 +46,7 @@ function Landing() {
 
       {/* Hero */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-24 md:py-32">
+        <div className="w-full px-6 py-24 md:py-32">
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs">
               <span className="status-dot processing" />
@@ -93,7 +104,7 @@ function Landing() {
 
       {/* Features */}
       <section id="features" className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-24">
+        <div className="w-full px-6 py-24">
           <h2 className="font-display text-4xl font-bold">Built for accountants who hate templates.</h2>
           <div className="mt-12 grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-2 lg:grid-cols-4">
             <Feature icon={<Zap />} title="Template-free" body="No vendor setup. Upload any invoice format and get fields back instantly." />
@@ -106,7 +117,7 @@ function Landing() {
 
       {/* Pricing */}
       <section id="pricing" className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-24">
+        <div className="w-full px-6 py-24">
           <div className="text-center">
             <h2 className="font-display text-4xl font-bold">Simple, document-based pricing.</h2>
             <p className="mt-3 text-muted-foreground">Start free. Upgrade only when you need more volume.</p>
@@ -130,7 +141,7 @@ function Landing() {
 
       {/* Social proof */}
       <section className="border-b border-border">
-        <div className="mx-auto max-w-6xl px-4 py-16">
+        <div className="w-full px-6 py-16">
           <p className="text-center font-mono text-xs uppercase tracking-wider text-muted-foreground">
             Trusted by independent accountants and finance teams
           </p>
@@ -143,7 +154,7 @@ function Landing() {
       </section>
 
       <footer className="border-t border-border">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground md:flex-row">
+        <div className="flex w-full flex-col items-center justify-between gap-4 px-6 py-8 text-sm text-muted-foreground md:flex-row">
           <div className="flex items-center gap-2">
             <div className="h-4 w-4 rounded-sm bg-primary" />
             <span className="font-display font-bold text-foreground">DocFlow</span>

@@ -1,7 +1,8 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileText, LayoutDashboard, Settings, LogOut } from "lucide-react";
+import { FileText, LayoutDashboard, Settings, LogOut, Sun, Moon } from "lucide-react";
+import { useAppTheme } from "@/lib/theme-context";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -33,13 +34,15 @@ function AuthedLayout() {
     navigate({ to: "/auth", replace: true });
   }
 
+  const { theme, toggle } = useAppTheme();
+
   const initials = (profile?.full_name || user.email || "U")
     .split(" ").map((s: string) => s[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
+        <div className="flex h-14 w-full items-center gap-6 px-6">
           <Link to="/dashboard" className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-sm bg-primary" />
             <span className="font-display text-lg font-bold">DocFlow</span>
@@ -59,6 +62,14 @@ function AuthedLayout() {
             >
               <Settings className="h-4 w-4" />
             </button>
+            <button
+              id="theme-toggle-dashboard"
+              onClick={toggle}
+              aria-label="Toggle theme"
+              className="theme-toggle"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-elevated text-xs font-medium">
               {initials}
             </div>
@@ -72,7 +83,7 @@ function AuthedLayout() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-8">
+      <main className="w-full px-6 py-8">
         <Outlet />
       </main>
     </div>
