@@ -3,7 +3,7 @@ import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const PLAN_LIMITS = { free: 30, pro: 500, team: 2000 } as const;
+const PLAN_LIMITS = { free: 5, pro: 50, team: 500 } as const;
 
 const ExtractedSchema = z.object({
   document_type: z.enum(["invoice", "receipt", "purchase_order", "other"]).nullable().optional(),
@@ -46,7 +46,7 @@ export const extractDocument = createServerFn({ method: "POST" })
       // Reset monthly counter if period rolled over, enforce plan limits
       const { data: profile } = await supabase
         .from("profiles")
-        .select("plan, documents_used_this_month, usage_period_start")
+        .select("plan, documents_used_this_month, usage_period_start, team_id")
         .eq("id", userId)
         .maybeSingle();
 
@@ -61,8 +61,21 @@ export const extractDocument = createServerFn({ method: "POST" })
           }).eq("id", userId);
           profile.documents_used_this_month = 0;
         }
-        const limit = PLAN_LIMITS[profile.plan as keyof typeof PLAN_LIMITS] ?? 30;
-        if (profile.documents_used_this_month >= limit) {
+        const limit = PLAN_LIMITS[profile.plan as keyof typeof PLAN_LIMITS] ?? 5;
+
+        // For team plan, count usage across all team members
+        let totalUsed = profile.documents_used_this_month;
+        if (profile.team_id) {
+          const { data: teamProfiles } = await supabaseAdmin
+            .from("profiles")
+            .select("documents_used_this_month")
+            .eq("team_id", profile.team_id)
+            .neq("id", userId);
+          const otherUsed = (teamProfiles ?? []).reduce((sum: number, p: any) => sum + (p.documents_used_this_month ?? 0), 0);
+          totalUsed += otherUsed;
+        }
+
+        if (totalUsed >= limit) {
           await supabase.from("documents").update({
             status: "error",
             error_message: `Monthly limit reached (${limit} documents on ${profile.plan} plan).`,
@@ -86,7 +99,7 @@ export const extractDocument = createServerFn({ method: "POST" })
         | "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 
       const aiRes = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 2048,
         system: `You are a document data extraction engine. Extract structured data from the provided invoice, receipt, or purchase order.
 
@@ -134,7 +147,8 @@ Return ONLY a valid JSON object with this exact structure — no markdown, no ex
 
       const textBlock = aiRes.content.find((b) => b.type === "text");
       if (!textBlock || textBlock.type !== "text") throw new Error("AI returned no text");
-      const rawArgs = JSON.parse(textBlock.text.trim());
+      const rawText = textBlock.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+      const rawArgs = JSON.parse(rawText);
       const parsed = ExtractedSchema.parse(rawArgs);
 
       // Use model's overall_confidence if provided, else average per-field confidence
@@ -201,11 +215,10 @@ Return ONLY a valid JSON object with this exact structure — no markdown, no ex
         extracted_at: new Date().toISOString(),
       }).eq("id", doc.id);
 
-      if (profile) {
-        await supabase.from("profiles").update({
-          documents_used_this_month: (profile.documents_used_this_month ?? 0) + 1,
-        }).eq("id", userId);
-      }
+      await supabase.from("profiles").upsert({
+        id: userId,
+        documents_used_this_month: (profile?.documents_used_this_month ?? 0) + 1,
+      }, { onConflict: "id" });
 
       return { ok: true };
     } catch (err) {

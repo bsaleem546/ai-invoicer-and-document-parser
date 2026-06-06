@@ -62,13 +62,13 @@ SaaS web app that extracts structured data from invoices, receipts, and purchase
 - Always verify webhook signatures — never skip this
 
 ## Plan Enforcement
-- Plans: free (30 docs/mo), pro (500 docs/mo), team (2000 docs/mo)
+- Plans: free (5 docs/mo), pro (50 docs/mo), team (500 docs/mo)
 - Check `profiles.documents_used_this_month` against plan limit before processing
 - Enforce in the edge function, not just on the frontend
 - Return 403 with `{ error: "limit_reached" }` when over quota
 
 ## AI Extraction
-- Model: claude-sonnet-4-20250514
+- Model: claude-sonnet-4-6
 - Always pass documents as base64 with correct media_type
 - Extraction returns JSON only — parse and validate before writing to DB
 - Write overall confidence as float 0–1 to `extracted_data.confidence_score`

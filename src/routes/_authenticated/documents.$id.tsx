@@ -122,7 +122,34 @@ function ReviewPage() {
     queryClient.invalidateQueries({ queryKey: ["document", id] });
   }
 
-  if (isLoading) return <p className="text-muted-foreground">Loading...</p>;
+  if (isLoading) return (
+    <div>
+      <div className="mb-6 flex items-center gap-3">
+        <div className="h-8 w-8 rounded-md bg-border animate-pulse" />
+        <div className="space-y-2">
+          <div className="h-6 w-48 rounded bg-border animate-pulse" />
+          <div className="h-3 w-24 rounded bg-border animate-pulse" />
+        </div>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md border border-border bg-surface p-3">
+          <div className="h-3 w-12 rounded bg-border animate-pulse mb-3" />
+          <div className="h-[400px] rounded bg-border animate-pulse" />
+        </div>
+        <div className="rounded-md border border-border bg-surface p-4 space-y-4">
+          <div className="h-3 w-24 rounded bg-border animate-pulse" />
+          <div className="grid grid-cols-2 gap-3">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="h-2.5 w-16 rounded bg-border animate-pulse" />
+                <div className="h-9 rounded bg-border animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
   if (!data?.document) return <p className="text-muted-foreground">Document not found.</p>;
 
   const doc = data.document;

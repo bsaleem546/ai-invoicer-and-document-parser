@@ -1,12 +1,21 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, Outlet, useMatchRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { FileText, AlertCircle, Search } from "lucide-react";
+import { FileText, AlertCircle, Search, RotateCcw } from "lucide-react";
+import { extractDocument } from "@/lib/documents.functions";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/documents")({
-  component: DocumentsList,
+  component: DocumentsRoot,
 });
+
+function DocumentsRoot() {
+  const matchRoute = useMatchRoute();
+  const isChild = matchRoute({ to: "/documents/$id" });
+  if (isChild) return <Outlet />;
+  return <DocumentsList />;
+}
 
 const STATUS_OPTIONS = ["all", "processing", "review", "exported", "error"] as const;
 const TYPE_OPTIONS = ["all", "invoice", "receipt", "purchase_order", "other"] as const;
@@ -17,6 +26,24 @@ function DocumentsList() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<(typeof STATUS_OPTIONS)[number]>("all");
   const [type, setType] = useState<(typeof TYPE_OPTIONS)[number]>("all");
+
+  const queryClient = useQueryClient();
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  async function handleRetry(documentId: string) {
+    setRetrying(documentId);
+    try {
+      await supabase.from("documents").update({ status: "processing", error_message: null }).eq("id", documentId);
+      await extractDocument({ data: { documentId } });
+      await queryClient.invalidateQueries({ queryKey: ["documents-list", user.id] });
+      toast.success("Document reprocessed successfully.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Retry failed");
+      await queryClient.invalidateQueries({ queryKey: ["documents-list", user.id] });
+    } finally {
+      setRetrying(null);
+    }
+  }
 
   const { data: documents, isLoading } = useQuery({
     queryKey: ["documents-list", user.id],
@@ -89,10 +116,28 @@ function DocumentsList() {
 
       {/* Table */}
       {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-12 animate-pulse rounded bg-surface" />
-          ))}
+        <div className="overflow-x-auto rounded-md border border-border bg-surface">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>File</th><th>Type</th><th>Vendor</th><th>Invoice #</th><th>Date</th><th className="text-right">Total</th><th>Uploaded</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...Array(6)].map((_, i) => (
+                <tr key={i}>
+                  <td><div className="h-4 w-44 rounded bg-border animate-pulse" /></td>
+                  <td><div className="h-4 w-16 rounded bg-border animate-pulse" /></td>
+                  <td><div className="h-4 w-28 rounded bg-border animate-pulse" /></td>
+                  <td><div className="h-4 w-20 rounded bg-border animate-pulse" /></td>
+                  <td><div className="h-4 w-20 rounded bg-border animate-pulse" /></td>
+                  <td><div className="h-4 w-16 rounded bg-border animate-pulse ml-auto" /></td>
+                  <td><div className="h-4 w-20 rounded bg-border animate-pulse" /></td>
+                  <td><div className="h-4 w-16 rounded bg-border animate-pulse" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-16 text-center">
@@ -157,12 +202,23 @@ function DocumentsList() {
                     <td className="font-mono text-xs text-muted-foreground">
                       {new Date(d.created_at).toLocaleDateString()}
                     </td>
-                    <td>
+                    <td onClick={(e) => d.status === "error" && e.stopPropagation()}>
                       <span className="inline-flex items-center gap-2 font-mono text-xs uppercase">
                         <span className={`status-dot ${d.status}`} />
                         {d.status}
                         {d.status === "error" && (
-                          <AlertCircle className="h-3 w-3 text-destructive" />
+                          <>
+                            <AlertCircle className="h-3 w-3 text-destructive" />
+                            <button
+                              onClick={() => handleRetry(d.id)}
+                              disabled={retrying === d.id}
+                              className="ml-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium normal-case bg-surface border border-border hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+                              title="Retry extraction"
+                            >
+                              <RotateCcw className={`h-2.5 w-2.5 ${retrying === d.id ? "animate-spin" : ""}`} />
+                              {retrying === d.id ? "Retrying…" : "Retry"}
+                            </button>
+                          </>
                         )}
                       </span>
                     </td>
